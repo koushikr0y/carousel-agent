@@ -36,6 +36,7 @@ wheels/
 *.sqlite3
 /tmp/
 *.log
+.bot.pid
 
 # OS & Editor
 .DS_Store
