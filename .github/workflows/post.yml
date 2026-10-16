@@ -1,0 +1,48 @@
+name: Daily carousel
+
+on:
+  schedule:
+    - cron: "30 3 * * *"   # daily at 03:30 UTC, adjust to taste
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    env:
+      TOPIC: ${{ vars.TOPIC }}
+      REGION: ${{ vars.REGION || 'US' }}
+      BRAND: ${{ vars.BRAND }}
+      DRY_RUN: ${{ vars.DRY_RUN || 'true' }}   # stays 'true' until you flip it
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      IG_USER_ID: ${{ secrets.IG_USER_ID }}
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium firefox
+
+      - name: Generate carousel
+        run: python main.py generate
+
+      - name: Commit slides (needed so Instagram can fetch the images)
+        run: |
+          git config user.name "carousel-bot"
+          git config user.email "carousel-bot@users.noreply.github.com"
+          git add posts
+          git commit -m "New carousel" || echo "Nothing to commit"
+          git push
+
+      - name: Publish to Instagram
+        if: env.DRY_RUN != 'true'
+        run: python main.py publish

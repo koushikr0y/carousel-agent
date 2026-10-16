@@ -1,0 +1,14 @@
+Ever wondered how to render thousands of independent characters without killing your frame rate in Godot 4? 🧟
+
+Recent benchmarks on GPU-driven rendering show that while pushing 2,500 animated zombies to the GPU is totally doable, the real hidden killer isn't the draw calls—it's the CPU readback.
+
+When your CPU constantly needs to query data back from the GPU buffers, you hit a massive synchronization bottleneck. The fix? Keep your data entirely GPU-side using compute shaders, MultiMeshInstance3D, and custom uniform buffers.
+
+Key Takeaways:
+• Offload transform matrices to storage buffers
+• Avoid CPU-GPU readbacks during active gameplay
+• Leverage Godot 4's modern rendering pipelines
+
+How many active entities can your current Godot project handle before dropping below 60 FPS? Let me know below! 👇
+
+#GodotEngine #GameDev #IndieDev #Godot4 #GameOptimization #IndieGameDev #GraphicsProgramming
