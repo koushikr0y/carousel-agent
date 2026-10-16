@@ -418,27 +418,28 @@ def render(slides: list[dict], folder: Path) -> None:
         browser.close()
 
 
-def generate() -> None:
-    signals = get_signals(TOPIC)
+def generate(custom_topic: str | None = None) -> Path:
+    target_topic = custom_topic.strip() if custom_topic else TOPIC
+    signals = get_signals(target_topic)
     if not signals:
-        sys.exit("No trend signals found. Aborting.")
+        signals = [f"Technical deep dive: {target_topic}"]
     POSTS.mkdir(exist_ok=True)
     history = json.loads(HISTORY.read_text()) if HISTORY.exists() else []
 
-    plan = ask_gemini(build_prompt(TOPIC, signals, history[-15:]))
+    plan = ask_gemini(build_prompt(target_topic, signals, history[-15:]))
     slides = plan["slides"][:10]  # API max is 10 items per carousel
     if len(slides) < 3:
-        sys.exit("Model returned too few slides.")
+        raise RuntimeError("Model returned too few slides.")
 
     folder = POSTS / dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M")
     render(slides, folder)
     (folder / "caption.txt").write_text(plan["caption"], encoding="utf-8")
-    LATEST.write_text(
-        json.dumps({"folder": folder.as_posix(), "slides": len(slides), "trend": plan["trend"]})
-    )
+    meta = {"folder": folder.as_posix(), "slides": len(slides), "trend": plan["trend"], "topic": target_topic}
+    LATEST.write_text(json.dumps(meta, indent=2))
     HISTORY.write_text(json.dumps((history + [plan["trend"]])[-30:], indent=2))
     print(f"Generated {len(slides)} BentoGrid slides in {folder} (trend: {plan['trend']})")
     print("\nCaption:\n" + plan["caption"])
+    return folder
 
 
 # ---------- test helpers (no API keys needed) ----------
@@ -658,12 +659,24 @@ def ig_login() -> None:
         print("    Please log into https://www.instagram.com in your Firefox browser first.")
 
 
+def generate_cli() -> None:
+    topic_arg = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else None
+    generate(custom_topic=topic_arg)
+
+
+def bot_command() -> None:
+    """Launch interactive Telegram Bot for carousel creation, preview, and approval."""
+    from telegram_bot import run_bot
+    run_bot()
+
+
 if __name__ == "__main__":
     commands = {
-        "generate": generate,
+        "generate": generate_cli,
         "publish": publish,
         "publish-browser": publish_browser,
         "ig-login": ig_login,
+        "bot": bot_command,
         "trends": trends,
         "selftest": selftest,
         "check-ig": check_ig,

@@ -2,6 +2,8 @@
 
 An automated agent that generates and publishes viral, high-retention multi-slide Instagram carousels with a consistent **BentoGrid Dark Mode** design system.
 
+Features full **Telegram Bot Automation**: send a topic idea from your phone, preview the 6 rendered slides in Telegram as a native photo album, and tap **[ 🚀 Approve & Publish ]** to post immediately to Instagram!
+
 Engineered for **Game Development (Godot Engine, Shaders, Systems Architecture)** and easily customizable to any niche.
 
 ---
@@ -9,24 +11,32 @@ Engineered for **Game Development (Godot Engine, Shaders, Systems Architecture)*
 ## ✨ Features
 
 - **🎨 Modern BentoGrid Visuals:** Clean glassmorphism cards, Plus Jakarta Sans typography, JetBrains Mono code snippets, and high-contrast metric callouts.
+- **📱 Telegram Interactive Bot:** Send any topic via Telegram, receive the rendered slides preview, review the caption, and publish with one tap.
 - **📐 4:5 Portrait Optimized:** Designed to occupy maximum mobile screen real estate on Instagram feeds.
-- **⚡ Two Powerful Publishing Engines:**
-  1. **Zero-Config Browser Automation (Default):** Uses your existing logged-in Firefox profile session. No Meta Developer accounts, no Facebook Pages, and no API tokens required.
-  2. **Official Meta Graph API:** Fully supported for cloud and headless CI/CD deployments.
+- **⚡ Zero-Config Browser Publishing (Default):** Uses your existing logged-in Firefox profile session. No Meta Developer accounts, no Facebook Pages, and no API tokens required.
 - **🧠 Google Gemini Integration:** Fast slide copywriting and breakdown with automatic fallback between models (`gemini-3.5-flash` & `gemini-3.5-flash-lite`).
 - **🔍 Trend & Signal Detection:** Analyzes developer news feeds and search signals for timely topics.
 
 ---
 
-## 📸 Design Preview
+## 🤖 Telegram Bot Workflow (Professional Setup)
 
-Every generated carousel follows a consistent 6-slide BentoGrid pattern:
-1. **Hook Slide:** Bold high-contrast headline, difficulty pill, reading time, and teaser stat.
-2. **The Problem / Architecture:** Breakdown of the bottleneck with technical specs and diagrams.
-3. **The Solution / Code:** Code snippets with syntax highlighting and callout tags.
-4. **Implementation Deep Dive:** Key insights with visual cards and status badges.
-5. **Results & Benchmarks:** Before/After performance metrics (FPS, Draw Calls, Memory).
-6. **Actionable Takeaways / CTA:** Key checklist and community discussion prompt.
+The bot lets you control your Instagram publishing pipeline entirely from your phone:
+
+```
+ You (on Telegram)                Telegram Bot                  Instagram (@intentdev)
+       │                               │                               │
+       │─── "Godot 4 NavMesh" ────────>│                               │
+       │                               │─── Generates 6 Bento Slides ──│
+       │                               │─── Writes Caption & Tags ─────│
+       │<── Sends Photo Album Preview ─│                               │
+       │<── Sends [Approve] Button ────│                               │
+       │                               │                               │
+       │─── Tap [Approve & Publish] ──>│                               │
+       │                               │─── Firefox Automation Upload ─│
+       │                               │─── 4:5 Portrait Crop & Share ─> Live on Feed!
+       │<── "✅ Published to @intentdev"│                               │
+```
 
 ---
 
@@ -36,6 +46,7 @@ Every generated carousel follows a consistent 6-slide BentoGrid pattern:
 - Python 3.10+
 - Firefox browser (logged into Instagram)
 - Free Gemini API key from [Google AI Studio](https://aistudio.google.com)
+- Free Telegram Bot Token from [@BotFather](https://t.me/BotFather) *(optional, for Telegram automation)*
 
 ### 2. Installation
 
@@ -71,29 +82,52 @@ BRAND=@intentdev
 
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-3.5-flash
+
+# Telegram Bot (for mobile topic submission & approval)
+TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRstuVWXyz
+TELEGRAM_ALLOWED_USERS=your_telegram_username
 ```
 
 ---
 
 ## 🚀 Usage
 
-### 1. Verify Instagram Session
-Detects and confirms your active Instagram session from your local Firefox profile:
+### Option A: Telegram Bot Automation (Recommended)
 
+Run the bot runner:
+
+```bash
+python main.py bot
+# or: python telegram_bot.py
+```
+
+Then open your bot on Telegram:
+1. Send `/start`
+2. Send any topic text: e.g. `Godot 4.3 Compute Shaders`
+3. View the 6-slide album preview and tap **[ 🚀 Approve & Publish to Instagram ]**!
+
+---
+
+### Option B: Command Line Interface
+
+#### 1. Verify Instagram Session
+Detects and confirms your active Instagram session from your local Firefox profile:
 ```bash
 python main.py ig-login
 ```
 
-### 2. Generate a New Carousel
+#### 2. Generate a New Carousel
 Generates high-resolution 1080x1350 JPEG slides and an engaging caption in `posts/`:
-
 ```bash
+# Uses default TOPIC from .env:
 python main.py generate
+
+# Or pass a specific topic:
+python main.py generate "Putting 2,500 zombies on GPU in Godot 4"
 ```
 
-### 3. Publish to Instagram
+#### 3. Publish to Instagram
 Uploads the 6 slides, adjusts aspect ratio to 4:5 portrait, applies captions and hashtags, and submits the post:
-
 ```bash
 python main.py publish
 ```
@@ -111,6 +145,7 @@ python main.py publish-browser --watch
 carousel-agent/
 ├── main.py                  # Core agent pipeline (trends, LLM generation, HTML rendering, CLI)
 ├── browser_publisher.py     # Playwright Firefox publisher using local session
+├── telegram_bot.py          # Telegram interactive bot (album preview & approval)
 ├── requirements.txt         # Python dependencies
 ├── .env.example             # Configuration template
 ├── .gitignore               # Environment & secrets protection
@@ -118,19 +153,6 @@ carousel-agent/
 └── posts/                   # Generated carousels & captions
     └── 20261016-1716/       # Latest published Godot BentoGrid carousel
 ```
-
----
-
-## ⚙️ Configuration Reference
-
-| Variable | Description | Default |
-|---|---|---|
-| `TOPIC` | Niche/focus for trends and content generation | `Godot game development` |
-| `BRAND` | Footer watermark / handle across slides | `@intentdev` |
-| `GEMINI_API_KEY` | Gemini API key from Google AI Studio | Required |
-| `GEMINI_MODEL` | Gemini model to query | `gemini-3.5-flash` |
-| `IG_USER_ID` | Optional: Meta Graph API User ID | *(Optional)* |
-| `IG_ACCESS_TOKEN` | Optional: Meta Graph API Access Token | *(Optional)* |
 
 ---
 
