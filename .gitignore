@@ -45,8 +45,9 @@ Thumbs.db
 *.swp
 *.swo
 
-# Temporary test post directories (keep 20261016-1716 as the published showcase)
+# Runtime generated posts (keep 20261016-1716 as the published showcase)
 posts/test_bento/
 posts/selftest/
-posts/20261016-1629/
-posts/20261016-1632/
+posts/202*
+!posts/20261016-1716/
+posts/*/published.json

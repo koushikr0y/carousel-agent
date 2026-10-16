@@ -92,11 +92,11 @@ class TelegramAPI:
             for fh in file_handles:
                 fh.close()
 
-    def answer_callback_query(self, callback_query_id: str, text: str = "") -> None:
+    def answer_callback_query(self, callback_query_id: str, text: str = "", show_alert: bool = False) -> None:
         try:
             requests.post(
                 f"{self.base}/answerCallbackQuery",
-                json={"callback_query_id": callback_query_id, "text": text},
+                json={"callback_query_id": callback_query_id, "text": text, "show_alert": show_alert},
                 timeout=10,
             )
         except Exception:
@@ -162,6 +162,9 @@ def run_bot() -> None:
     from main import generate, LATEST
     from browser_publisher import publish_via_browser, get_firefox_cookies
 
+    ACTIVE_PUBLISHING_LOCKS: set[str] = set()
+    ACTIVE_GENERATING_LOCKS: set[int] = set()
+
     offset = None
 
     while True:
@@ -187,19 +190,60 @@ def run_bot() -> None:
                         folder_name = data.split("pub:", 1)[1]
                         folder_path = Path("posts") / folder_name
                         if not folder_path.exists():
-                            tg.answer_callback_query(cb_id, "Folder not found!")
+                            tg.answer_callback_query(cb_id, "⚠️ Carousel folder not found!", show_alert=True)
                             continue
 
+                        published_marker = folder_path / "published.json"
+
+                        # Check 1: Prevent duplicate uploads if already published previously
+                        if published_marker.exists():
+                            tg.answer_callback_query(
+                                cb_id,
+                                "⚠️ Already Published!\n\nThis carousel is already live on Instagram (@intentdev).",
+                                show_alert=True,
+                            )
+                            tg.edit_message_text(
+                                chat_id,
+                                msg_id,
+                                f"✅ <b>Already Published to Instagram!</b>\n\n"
+                                f"<b>Account:</b> @intentdev\n"
+                                f"<b>Folder:</b> <code>{folder_name}</code>\n"
+                                f"<b>Status:</b> Live on feed",
+                                reply_markup=None,
+                            )
+                            continue
+
+                        # Check 2: Prevent race conditions if button tapped multiple times rapidly
+                        if folder_name in ACTIVE_PUBLISHING_LOCKS:
+                            tg.answer_callback_query(
+                                cb_id,
+                                "⏳ Upload in progress! Please wait a moment...",
+                                show_alert=False,
+                            )
+                            continue
+
+                        ACTIVE_PUBLISHING_LOCKS.add(folder_name)
                         tg.answer_callback_query(cb_id, "🚀 Launching Instagram publisher...")
+
+                        # Immediately remove buttons so user cannot click again
                         tg.edit_message_text(
                             chat_id,
                             msg_id,
-                            f"⏳ <b>Publishing carousel to Instagram (@intentdev)...</b>\n"
+                            f"⏳ <b>Publishing carousel to Instagram (@intentdev)...</b>\n\n"
                             f"<i>Uploading 6 BentoGrid slides via Firefox session...</i>",
+                            reply_markup=None,
                         )
 
                         try:
                             publish_via_browser(folder_path, headless=True, auto_share=True)
+                            # Record permanent marker on disk
+                            published_marker.write_text(
+                                json.dumps({
+                                    "published_at": time.time(),
+                                    "folder": folder_name,
+                                    "account": os.getenv("BRAND", "@intentdev"),
+                                }, indent=2)
+                            )
                             tg.edit_message_text(
                                 chat_id,
                                 msg_id,
@@ -207,6 +251,7 @@ def run_bot() -> None:
                                 f"<b>Account:</b> @intentdev\n"
                                 f"<b>Folder:</b> <code>{folder_name}</code>\n"
                                 f"<b>Status:</b> Live on feed",
+                                reply_markup=None,
                             )
                         except Exception as e:
                             tg.edit_message_text(
@@ -221,9 +266,16 @@ def run_bot() -> None:
                                     ]
                                 },
                             )
+                        finally:
+                            ACTIVE_PUBLISHING_LOCKS.discard(folder_name)
 
                     elif data.startswith("regen:"):
                         topic = data.split("regen:", 1)[1]
+                        if chat_id in ACTIVE_GENERATING_LOCKS:
+                            tg.answer_callback_query(cb_id, "⏳ A carousel is already generating, please wait!")
+                            continue
+
+                        ACTIVE_GENERATING_LOCKS.add(chat_id)
                         tg.answer_callback_query(cb_id, f"Regenerating: {topic}...")
                         tg.send_message(chat_id, f"🔄 <b>Generating new carousel angle for:</b> <i>{topic}</i>...")
                         tg.send_chat_action(chat_id, "upload_photo")
@@ -248,6 +300,8 @@ def run_bot() -> None:
                             )
                         except Exception as e:
                             tg.send_message(chat_id, f"❌ Generation error: <code>{e}</code>")
+                        finally:
+                            ACTIVE_GENERATING_LOCKS.discard(chat_id)
 
                     elif data.startswith("discard:"):
                         tg.answer_callback_query(cb_id, "Carousel discarded.")
@@ -325,16 +379,27 @@ def run_bot() -> None:
                         caption = (folder / "caption.txt").read_text(encoding="utf-8") if (folder / "caption.txt").exists() else ""
 
                         tg.send_carousel_album(chat_id, slides)
+                        is_pub = (folder / "published.json").exists()
+                        action_btn = (
+                            {"text": "✅ Already Published", "callback_data": f"pub:{folder.name}"}
+                            if is_pub
+                            else {"text": "🚀 Approve & Publish to Instagram", "callback_data": f"pub:{folder.name}"}
+                        )
                         tg.send_message(
                             chat_id,
                             f"<b>📂 Latest Carousel ({folder.name}):</b>\n\n{caption}",
                             reply_markup={
                                 "inline_keyboard": [
-                                    [{"text": "🚀 Approve & Publish to Instagram", "callback_data": f"pub:{folder.name}"}],
+                                    [action_btn],
                                     [{"text": "❌ Discard", "callback_data": f"discard:{folder.name}"}],
                                 ]
                             },
                         )
+                        continue
+
+                    # Treat any text or /generate <topic> as a carousel creation request
+                    if chat_id in ACTIVE_GENERATING_LOCKS:
+                        tg.send_message(chat_id, "⏳ <b>A carousel is already being generated!</b> Please wait a few seconds.")
                         continue
 
                     topic = text
@@ -343,6 +408,7 @@ def run_bot() -> None:
                     if not topic:
                         topic = os.getenv("TOPIC", "Godot game development")
 
+                    ACTIVE_GENERATING_LOCKS.add(chat_id)
                     tg.send_message(
                         chat_id,
                         f"🎨 <b>Creating BentoGrid Carousel...</b>\n\n"
@@ -373,6 +439,8 @@ def run_bot() -> None:
                         )
                     except Exception as e:
                         tg.send_message(chat_id, f"❌ <b>Generation Failed:</b> <code>{e}</code>")
+                    finally:
+                        ACTIVE_GENERATING_LOCKS.discard(chat_id)
 
         except KeyboardInterrupt:
             print("\n>> Bot stopped by user.")

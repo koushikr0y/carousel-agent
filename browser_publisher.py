@@ -23,6 +23,8 @@ def get_firefox_cookies() -> list[dict]:
     # Sort by newest modified
     candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
 
+    session_file = Path(".ig_session/cookies.json")
+
     for cf in candidates:
         tmp_db = f"/tmp/ff_cookies_{int(time.time())}.sqlite"
         try:
@@ -67,6 +69,14 @@ def get_firefox_cookies() -> list[dict]:
                         "httpOnly": bool(is_http_only),
                         "sameSite": ss,
                     })
+
+                # Automatically cache for Docker / cloud deployments
+                try:
+                    Path(".ig_session").mkdir(exist_ok=True)
+                    session_file.write_text(json.dumps(cookies, indent=2))
+                except Exception:
+                    pass
+
                 return cookies
         except Exception:
             if os.path.exists(tmp_db):
@@ -74,6 +84,16 @@ def get_firefox_cookies() -> list[dict]:
                     os.remove(tmp_db)
                 except Exception:
                     pass
+
+    # Fallback to saved session file if running on a headless server without Firefox desktop
+    if session_file.exists():
+        try:
+            saved_cookies = json.loads(session_file.read_text())
+            if any(c.get("name") == "sessionid" for c in saved_cookies):
+                print(f"[✓] Loaded active Instagram session from {session_file}")
+                return saved_cookies
+        except Exception:
+            pass
 
     return []
 

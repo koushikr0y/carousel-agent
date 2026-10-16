@@ -1,0 +1,10 @@
+services:
+  carousel-bot:
+    build: .
+    container_name: carousel_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./posts:/app/posts
+      - ./.ig_session:/app/.ig_session
